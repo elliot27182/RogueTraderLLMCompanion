@@ -290,8 +290,7 @@ namespace RogueTraderLLMCompanion.Combat
                     case ActionType.Delay:
                         return DelayTurn(gameUnit);
 
-                    case ActionType.TakeCover:
-                        return TakeCover(gameUnit);
+                    // NOTE: TakeCover case removed - feature not implemented
 
                     case ActionType.Sequence:
                         return ExecuteSequence(action, gameUnit);
@@ -540,11 +539,8 @@ namespace RogueTraderLLMCompanion.Combat
             }
         }
 
-        private bool TakeCover(BaseUnitEntity unit)
-        {
-            Main.LogWarning("TakeCover action not yet implemented.");
-            return false;
-        }
+        // NOTE: TakeCover method removed - feature not implemented
+        // Will be added when cover movement logic is implemented
 
         private bool ExecuteSequence(LLMAction action, BaseUnitEntity unit)
         {

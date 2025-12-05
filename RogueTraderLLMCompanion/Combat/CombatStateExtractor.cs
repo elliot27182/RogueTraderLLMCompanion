@@ -380,8 +380,9 @@ namespace RogueTraderLLMCompanion.Combat
 
         private int GetAbilityAPCost(BlueprintAbility blueprint)
         {
-            // This would need to check the ability's action type
-            return 1; // Default
+            // VERIFIED API: BlueprintAbility.ActionPointCost (line 1183 of BlueprintAbility.cs)
+            // Default value is 1, but heavy weapons and some abilities cost more
+            return blueprint?.ActionPointCost ?? 1;
         }
 
         private bool CanUseAbility(BaseUnitEntity unit, Ability ability)

@@ -160,11 +160,27 @@ namespace RogueTraderLLMCompanion.Models
 
             cleaned = cleaned.Trim();
 
-            // Find the JSON object
+            // Find the FIRST complete JSON object (handle nested braces properly)
             int start = cleaned.IndexOf('{');
-            int end = cleaned.LastIndexOf('}');
+            if (start < 0) return cleaned;
             
-            if (start >= 0 && end > start)
+            int depth = 0;
+            int end = -1;
+            for (int i = start; i < cleaned.Length; i++)
+            {
+                if (cleaned[i] == '{') depth++;
+                else if (cleaned[i] == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        end = i;
+                        break;
+                    }
+                }
+            }
+            
+            if (end > start)
                 return cleaned.Substring(start, end - start + 1);
 
             return cleaned;
@@ -218,9 +234,8 @@ namespace RogueTraderLLMCompanion.Models
         [JsonProperty("delay")]
         Delay,
 
-        /// <summary>Take cover at current position</summary>
-        [JsonProperty("take_cover")]
-        TakeCover,
+        // NOTE: TakeCover removed - not implemented yet
+        // Add back when cover movement logic is implemented
 
         /// <summary>Execute a sequence of actions</summary>
         [JsonProperty("sequence")]
