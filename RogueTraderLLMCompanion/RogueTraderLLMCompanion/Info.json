@@ -1,0 +1,14 @@
+{
+  "Id": "RogueTraderLLMCompanion",
+  "DisplayName": "LLM Companion AI",
+  "Description": "Let an LLM (GPT-4, Gemini, Claude) control your companions in combat with expert-level tactical AI.",
+  "Author": "User",
+  "Version": "1.0.0",
+  "ManagerVersion": "0.27.0",
+  "GameVersion": "1.0.0",
+  "Requirements": [],
+  "AssemblyName": "RogueTraderLLMCompanion.dll",
+  "EntryMethod": "RogueTraderLLMCompanion.Main.Load",
+  "HomePage": "",
+  "Repository": ""
+}

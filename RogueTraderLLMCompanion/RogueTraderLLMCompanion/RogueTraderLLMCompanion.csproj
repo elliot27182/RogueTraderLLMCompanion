@@ -1,0 +1,131 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>RogueTraderLLMCompanion</AssemblyName>
+    <RootNamespace>RogueTraderLLMCompanion</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>embedded</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <!-- ============================================================== -->
+  <!-- CONFIGURATION: Update GamePath to your Rogue Trader installation -->
+  <!-- ============================================================== -->
+  <PropertyGroup>
+    <!-- Steam installation (default) -->
+    <GamePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Rogue Trader')">C:\Program Files (x86)\Steam\steamapps\common\Warhammer 40000 Rogue Trader</GamePath>
+    
+    <!-- GOG installation (fallback) -->
+    <GamePath Condition="'$(GamePath)' == '' And Exists('C:\GOG Games\Warhammer 40000 Rogue Trader')">C:\GOG Games\Warhammer 40000 Rogue Trader</GamePath>
+    
+    <!-- Manual override - uncomment and set your path if auto-detection fails -->
+    <!-- <GamePath>D:\Games\Warhammer 40000 Rogue Trader</GamePath> -->
+    
+    <ManagedPath>$(GamePath)\WH40KRT_Data\Managed</ManagedPath>
+    <ModsPath>$(GamePath)\Mods</ModsPath>
+  </PropertyGroup>
+
+  <!-- Build configurations -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;DEBUG_WITHOUT_GAME</DefineConstants>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants></DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- NuGet packages (Harmony used as fallback if game DLL missing) -->
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.2.2" />
+  </ItemGroup>
+
+  <!-- Game Assembly References (only in Release configuration) -->
+  <ItemGroup Condition="'$(Configuration)' == 'Release' And Exists('$(ManagedPath)')">
+    <!-- Core game assembly -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ManagedPath)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Unity Engine -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedPath)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ManagedPath)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(ManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Unity Mod Manager -->
+    <Reference Include="UnityModManager">
+      <HintPath>$(ManagedPath)\UnityModManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Game uses its own Harmony and JSON -->
+    <Reference Include="0Harmony">
+      <HintPath>$(ManagedPath)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ManagedPath)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
+    <!-- Additional game assemblies -->
+    <Reference Include="Kingmaker.Controllers" Condition="Exists('$(ManagedPath)\Kingmaker.Controllers.dll')">
+      <HintPath>$(ManagedPath)\Kingmaker.Controllers.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Code" Condition="Exists('$(ManagedPath)\Code.dll')">
+      <HintPath>$(ManagedPath)\Code.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Fallback references for Debug build without game -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+  </ItemGroup>
+
+  <!-- Include Info.json in output -->
+  <ItemGroup>
+    <None Update="Info.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Post-build: Copy to mod folder (Release only) -->
+  <Target Name="CopyToModFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' And Exists('$(ModsPath)')">
+    <PropertyGroup>
+      <ModFolder>$(ModsPath)\RogueTraderLLMCompanion</ModFolder>
+    </PropertyGroup>
+    <Message Importance="High" Text="Copying mod to: $(ModFolder)" />
+    <MakeDir Directories="$(ModFolder)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModFolder)" />
+    <Copy SourceFiles="$(ProjectDir)Info.json" DestinationFolder="$(ModFolder)" />
+    <Message Importance="High" Text="Mod installed successfully!" />
+  </Target>
+
+  <!-- Warn if game not found -->
+  <Target Name="CheckGamePath" BeforeTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <Warning Condition="!Exists('$(GamePath)')" 
+             Text="Game not found at '$(GamePath)'. Update GamePath in .csproj to your Rogue Trader installation." />
+    <Warning Condition="!Exists('$(ManagedPath)\Assembly-CSharp.dll')" 
+             Text="Game assemblies not found at '$(ManagedPath)'. Make sure the game is installed." />
+  </Target>
+</Project>
