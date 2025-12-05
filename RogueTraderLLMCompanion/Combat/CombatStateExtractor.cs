@@ -201,7 +201,7 @@ namespace RogueTraderLLMCompanion.Combat
                 {
                     Id = unit.UniqueId ?? "unit_" + unit.GetHashCode(),
                     Name = unit.CharacterName ?? "Unknown",
-                    UnitType = unit.Blueprint?.Type?.ToString() ?? "Unknown",
+                    UnitType = unit.IsPlayerFaction ? "Ally" : (unit.IsEnemy() ? "Enemy" : "Neutral"),
 
                     // Health - using pattern from ToyBox
                     CurrentHP = (int)(health?.MaxHitPoints ?? 0) - (int)(health?.Damage ?? 0),
@@ -362,11 +362,18 @@ namespace RogueTraderLLMCompanion.Combat
         {
             if (blueprint == null) return AbilityType.Attack;
 
-            // Determine type based on ability properties
-            if (blueprint.EffectOnEnemy == AbilityEffectOnUnit.Harmful)
+            // Verified API: Use boolean flags instead of Type enum
+            if (blueprint.IsSpell || blueprint.IsPsykerAbility)
+                return AbilityType.Spell;
+            
+            if (blueprint.IsWeaponAbility)
                 return AbilityType.Attack;
+
             if (blueprint.EffectOnAlly == AbilityEffectOnUnit.Helpful)
                 return AbilityType.Support;
+
+            if (blueprint.EffectOnEnemy == AbilityEffectOnUnit.Harmful)
+                return AbilityType.Attack;
 
             return AbilityType.Attack;
         }

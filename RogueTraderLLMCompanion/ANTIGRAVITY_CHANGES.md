@@ -46,6 +46,25 @@ I analyzed other core components and confirmed they match the game's API:
 
 I have updated `GAME_API_REFERENCE.md` in the project root with the fully verified method signatures to prevent future hallucinations.
 
+
+## 4. Additional Fixes (CombatStateExtractor.cs)
+
+### Ability & Weapon Classification
+*   **Issue**: `BlueprintAbility.Type` property does not exist or is unreliable. `UnitType` string construction was also flawed.
+*   **Fix**: 
+    - Replaced `DetermineAbilityType` to use verified boolean flags: `IsSpell`, `IsPsykerAbility`, `IsWeaponAbility`, `EffectOnAlly`, `EffectOnEnemy`.
+    - Updated `UnitType` to use `unit.IsPlayerFaction` and `unit.IsEnemy()` checks.
+
 ---
 **Summary for Claude**:
-The "Hallucination Check" passed for AI Control and State Reading, but failed for `UnitMoveTo`. The movement logic was rewritten to use the `PathfindingService` -> `ForcedPath` -> `UnitMoveToParams` pipeline found in `Kingmaker.UnitLogic.Commands`.
+The "Hallucination Check" passed for AI Control and State Reading, but failed for `UnitMoveTo` and `BlueprintAbility.Type`. 
+1. **Movement**: Rewritten to use `PathfindingService` -> `ForcedPath` -> `UnitMoveToParams`.
+2. **Abilities**: Switched from non-existent `Type` enum to `IsSpell`/`IsWeaponAbility` booleans.
+
+### Turn Logic & Safety
+*   **Issue**: `TurnController.StartUnitTurn` postfix patch was too late to intercept default AI.
+*   **Fix**: Changed to `Prefix` patch to disable AI before the turn logic executes.
+*   **Issue**: `ability.Cast()` bypasses animation queue.
+*   **Fix**: Switched to `UnitUseAbility` command pattern for proper sequencing.
+
+

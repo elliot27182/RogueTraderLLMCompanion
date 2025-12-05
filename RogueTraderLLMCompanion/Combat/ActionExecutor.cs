@@ -308,10 +308,40 @@ namespace RogueTraderLLMCompanion.Combat
             }
         }
 
+        // Helper method for verified grid-based movement
+        private UnitMoveTo CreateValidMoveCommand(BaseUnitEntity unit, Vector3 targetPoint)
+        {
+            try 
+            {
+                // VALDIATED PATHFINDING WORKFLOW
+                // 1. Calculate path synchronously using PathfindingService
+                ForcedPath path = PathfindingService.Instance.FindPathRT_Blocking(unit.MovementAgent, targetPoint, 0f);
+
+                if (path == null || path.error)
+                {
+                    Main.LogError("Failed to calculate path to target.");
+                    return null;
+                }
+
+                // 2. Create Movement Parameters
+                var moveParams = new UnitMoveToParams(path, targetPoint, 0f);
+
+                // 3. Create Command
+                return new UnitMoveTo(moveParams)
+                {
+                    CreatedByPlayer = true
+                };
+            }
+            catch (Exception ex)
+            {
+                Main.LogError($"Error generating move command: {ex.Message}");
+                return null;
+            }
+        }
+
         private bool ExecuteAbility(LLMAction action, BaseUnitEntity unit)
         {
             // Find the ability by ID
-            // API verified from ToyBox ActionsRT.cs
             var ability = unit.Abilities?.RawFacts?.FirstOrDefault(
                 a => a.Blueprint?.AssetGuid.ToString() == action.AbilityId);
 
@@ -322,33 +352,27 @@ namespace RogueTraderLLMCompanion.Combat
             }
 
             // Find the target unit
-            BaseUnitEntity target = null;
+            BaseUnitEntity targetUnit = null;
             if (!string.IsNullOrEmpty(action.TargetId))
             {
-                target = FindGameUnit(action.TargetId);
+                targetUnit = FindGameUnit(action.TargetId);
             }
 
-            Main.Log($"Executing ability: {action.AbilityName} -> {target?.CharacterName ?? "self"}");
+            Main.Log($"Executing ability: {action.AbilityName} -> {targetUnit?.CharacterName ?? "self"}");
 
             try
             {
-                // Create ability execution context
-                // The ability.TryCast or similar method would be used
-                // This pattern is from examining how abilities are used in the game
-                if (target != null)
+                // Verified API Pattern: UnitUseAbility command
+                // This ensures animations, sounds, and time costs are handled correctly by the engine
+                TargetWrapper targetWrapper = targetUnit != null ? new TargetWrapper(targetUnit) : new TargetWrapper(unit);
+                
+                var useAbilityParams = new UnitUseAbilityParams(ability.Data, targetWrapper)
                 {
-                    // Targeted ability
-                    var context = ability.CreateExecutionContext(target);
-                    ability.Spend();
-                    ability.Cast(new AbilityExecutionContext(context));
-                }
-                else
-                {
-                    // Self-targeted ability
-                    var context = ability.CreateExecutionContext(unit);
-                    ability.Spend();
-                    ability.Cast(new AbilityExecutionContext(context));
-                }
+                    IgnoreCooldown = false
+                };
+
+                var command = new UnitUseAbility(useAbilityParams);
+                unit.Commands.Run(command);
 
                 return true;
             }
@@ -369,72 +393,16 @@ namespace RogueTraderLLMCompanion.Combat
 
             // Convert to Unity Vector3
             var targetPoint = new Vector3(action.TargetPosition.X, 0, action.TargetPosition.Y);
-
             Main.Log($"Moving to: ({action.TargetPosition.X:F0}, {action.TargetPosition.Y:F0})");
 
-            try
+            var moveCommand = CreateValidMoveCommand(unit, targetPoint);
+            if (moveCommand != null)
             {
-                // =================================================================
-                // WARNING: Movement in Rogue Trader is GRID-BASED!
-                // The ToyBox code shows factory methods are used:
-                // - UnitHelper.CreateMoveCommandUnit()
-                // - UnitHelper.CreateMoveCommandParamsRT()
-                // These return UnitMoveToProperParams or UnitMoveToParams
-                // 
-                // The simple UnitMoveTo(point, threshold) may not work properly
-                // for grid-aligned movement. This is a BEST GUESS approach.
-                // 
-                // If movement fails, try:
-                // 1. Using the factory methods above
-                // 2. Creating a ForcedPath for grid alignment
-                // 3. Using the game's click-to-move system
-                // =================================================================
-                
-                // VALDIATED PATHFINDING WORKFLOW (Verified 2025-12-05 via decompilation)
-                // 1. Calculate path synchronously using PathfindingService
-                //    FindPathRT_Blocking is the correct API for real-time/combat path generation
-                ForcedPath path = PathfindingService.Instance.FindPathRT_Blocking(unit.MovementAgent, targetPoint, 0f);
-
-                if (path == null || path.error)
-                {
-                    Main.LogError("Failed to calculate path to target.");
-                    return false;
-                }
-
-                // 2. Create Movement Parameters
-                //    UnitMoveToParams requires the calculated path. 
-                //    TargetWrapper has implicit conversion from Vector3.
-                var moveParams = new UnitMoveToParams(path, targetPoint, 0f);
-
-                // 3. Create Command
-                //    Pass the params to the command
-                var moveCommand = new UnitMoveTo(moveParams)
-                {
-                    CreatedByPlayer = true
-                };
-                
-                // 4. Run Command
                 unit.Commands.Run(moveCommand);
-
                 return true;
             }
-            catch (Exception ex)
-            {
-                Main.LogError($"Failed to execute move: {ex.Message}");
-                
-                // Approach 2: Try alternative if simple approach fails
-                try
-                {
-                    Main.LogDebug("Trying alternative movement approach...");
-                    // The game may have a different API - this is speculation
-                    // You may need to use ForcedPath or click handlers
-                    return false;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
+
+            return false;
         }
 
         /// <summary>
@@ -451,14 +419,19 @@ namespace RogueTraderLLMCompanion.Combat
                 if (action.TargetPosition != null)
                 {
                     var targetPoint = new Vector3(action.TargetPosition.X, 0, action.TargetPosition.Y);
-                    var moveCommand = new UnitMoveTo(targetPoint, 0.3f)
-                    {
-                        CreatedByPlayer = true
-                    };
                     
-                    // Queue (not Run) - this adds to the queue without interrupting
-                    unit.Commands.Run(moveCommand);
-                    Main.LogDebug($"Queued move to ({action.TargetPosition.X:F0}, {action.TargetPosition.Y:F0})");
+                    var moveCommand = CreateValidMoveCommand(unit, targetPoint);
+                    if (moveCommand != null)
+                    {
+                        // Run adds to the queue
+                        unit.Commands.Run(moveCommand);
+                        Main.LogDebug($"Queued move to ({action.TargetPosition.X:F0}, {action.TargetPosition.Y:F0})");
+                    }
+                    else 
+                    {
+                        Main.LogError("Failed to generate move command for MoveAndAttack");
+                        return false;
+                    }
                 }
 
                 // Find and queue the ability
@@ -468,28 +441,23 @@ namespace RogueTraderLLMCompanion.Combat
                 if (ability == null)
                 {
                     Main.LogWarning($"Ability not found for MoveAndAttack: {action.AbilityId}");
-                    // Move was already queued, so partial success
-                    return action.TargetPosition != null;
+                    return action.TargetPosition != null; // Partial success if moved
                 }
 
-                BaseUnitEntity target = null;
+                BaseUnitEntity targetUnit = null;
                 if (!string.IsNullOrEmpty(action.TargetId))
                 {
-                    target = FindGameUnit(action.TargetId);
+                    targetUnit = FindGameUnit(action.TargetId);
                 }
 
                 // Create and queue the ability command
-                // The game engine will execute this AFTER the move completes
-                if (target != null)
-                {
-                    var context = ability.CreateExecutionContext(target);
-                    // Note: Some abilities may need UnitUseAbility command instead
-                    // This depends on the specific ability type
-                    ability.Spend();
-                    ability.Cast(new AbilityExecutionContext(context));
-                }
-
+                TargetWrapper targetWrapper = targetUnit != null ? new TargetWrapper(targetUnit) : new TargetWrapper(unit);
+                var useAbilityParams = new UnitUseAbilityParams(ability.Data, targetWrapper);
+                var abilityCommand = new UnitUseAbility(useAbilityParams);
+                
+                unit.Commands.Run(abilityCommand);
                 Main.LogDebug($"Queued ability {action.AbilityName}");
+
                 return true;
             }
             catch (Exception ex)
@@ -574,8 +542,7 @@ namespace RogueTraderLLMCompanion.Combat
 
         private bool TakeCover(BaseUnitEntity unit)
         {
-            Main.Log("Taking cover");
-            // Would need to find nearest cover and move to it
+            Main.LogWarning("TakeCover action not yet implemented.");
             return false;
         }
 

@@ -41,9 +41,10 @@ namespace RogueTraderLLMCompanion.Combat
         public static class TurnStartPatch
         {
             /// <summary>
-            /// Postfix runs after the original method completes.
+            /// Prefix runs *before* the original method.
+            /// Vital to disable AI before it ticks.
             /// </summary>
-            static void Postfix(TurnController __instance)
+            static void Prefix(TurnController __instance)
             {
                 try
                 {
@@ -54,7 +55,7 @@ namespace RogueTraderLLMCompanion.Combat
                     var currentUnit = __instance.CurrentUnit as BaseUnitEntity;
                     if (currentUnit != null && _combatController.ShouldControlUnit(currentUnit))
                     {
-                        Main.LogDebug($"LLM taking control of: {currentUnit.CharacterName}");
+                        Main.LogDebug($"LLM Intercepting Turn: {currentUnit.CharacterName}");
                         _combatController.OnUnitTurnStart(currentUnit);
                     }
                 }
