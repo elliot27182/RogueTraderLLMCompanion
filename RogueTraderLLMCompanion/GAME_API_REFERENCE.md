@@ -2,12 +2,27 @@
 
 ## Verified Source Links
 
-All APIs documented here are from **ToyBox-RogueTrader** open source mod:
+All APIs documented here are from **ToyBox-RogueTrader** mod + **decompiled Code.dll**:
 - **Repository**: https://github.com/xADDBx/ToyBox-RogueTrader
-- **Combat Actions**: https://github.com/xADDBx/ToyBox-RogueTrader/blob/main/ToyBox/Classes/MonkeyPatchin/BagOfPatches/Combat/ActionsRT.cs
-- **Unit Utils**: https://github.com/xADDBx/ToyBox-RogueTrader/blob/main/ToyBox/Classes/Infrastructure/BaseUnitDataUtils.cs  
-- **Movement**: https://github.com/xADDBx/ToyBox-RogueTrader/blob/main/ToyBox/Classes/MonkeyPatchin/BagOfPatches/MovementRT.cs
-- **Actions RT**: https://github.com/xADDBx/ToyBox-RogueTrader/blob/main/ToyBox/Classes/MainUI/ActionsRT.cs
+- **Decompiled**: `Code.dll` from `<GamePath>/Warhammer 40000 Rogue Trader_Data/Managed/`
+
+---
+
+> [!TIP]
+> ## ✅ VERIFIED APIs (from decompiled Code.dll)
+> 
+> These API names have been **verified** by decompiling the game's `Code.dll`:
+> 
+> | What | Verified Name | Source File |
+> |------|--------------|-------------|
+> | **Yellow AP** | `ActionPointsYellow` | `PartUnitCombatState.cs` |
+> | **Blue AP** | `ActionPointsBlue` | `PartUnitCombatState.cs` |
+> | **Max Blue AP** | `ActionPointsBlueMax` | `PartUnitCombatState.cs` |
+> | **AI Control** | `PartUnitBrain.IsAIEnabled` | `PartUnitBrain.cs` |
+> | **Pathfinding** | `PathfindingService.Instance.FindPathRT_Blocking` | `PathfindingService.cs` |
+> | **Move Params** | `UnitMoveToParams(ForcedPath, ...)` | `UnitMoveToParams.cs` |
+> | **Move Command** | `UnitMoveTo` | `UnitMoveTo.cs` |
+> | **Targeting** | `TargetWrapper` (implicit `Vector3`) | `TargetWrapper.cs` |
 
 ---
 

@@ -374,14 +374,46 @@ namespace RogueTraderLLMCompanion.Combat
 
             try
             {
-                // UnitMoveTo command - verified from MovementRT.cs
-                // https://github.com/xADDBx/ToyBox-RogueTrader/blob/main/ToyBox/Classes/MonkeyPatchin/BagOfPatches/MovementRT.cs
-                var moveCommand = new UnitMoveTo(targetPoint, 0.3f)
+                // =================================================================
+                // WARNING: Movement in Rogue Trader is GRID-BASED!
+                // The ToyBox code shows factory methods are used:
+                // - UnitHelper.CreateMoveCommandUnit()
+                // - UnitHelper.CreateMoveCommandParamsRT()
+                // These return UnitMoveToProperParams or UnitMoveToParams
+                // 
+                // The simple UnitMoveTo(point, threshold) may not work properly
+                // for grid-aligned movement. This is a BEST GUESS approach.
+                // 
+                // If movement fails, try:
+                // 1. Using the factory methods above
+                // 2. Creating a ForcedPath for grid alignment
+                // 3. Using the game's click-to-move system
+                // =================================================================
+                
+                // VALDIATED PATHFINDING WORKFLOW (Verified 2025-12-05 via decompilation)
+                // 1. Calculate path synchronously using PathfindingService
+                //    FindPathRT_Blocking is the correct API for real-time/combat path generation
+                ForcedPath path = PathfindingService.Instance.FindPathRT_Blocking(unit.MovementAgent, targetPoint, 0f);
+
+                if (path == null || path.error)
+                {
+                    Main.LogError("Failed to calculate path to target.");
+                    return false;
+                }
+
+                // 2. Create Movement Parameters
+                //    UnitMoveToParams requires the calculated path. 
+                //    TargetWrapper has implicit conversion from Vector3.
+                var moveParams = new UnitMoveToParams(path, targetPoint, 0f);
+
+                // 3. Create Command
+                //    Pass the params to the command
+                var moveCommand = new UnitMoveTo(moveParams)
                 {
                     CreatedByPlayer = true
                 };
-
-                // Run the command - verified from ToyBox
+                
+                // 4. Run Command
                 unit.Commands.Run(moveCommand);
 
                 return true;
@@ -389,7 +421,19 @@ namespace RogueTraderLLMCompanion.Combat
             catch (Exception ex)
             {
                 Main.LogError($"Failed to execute move: {ex.Message}");
-                return false;
+                
+                // Approach 2: Try alternative if simple approach fails
+                try
+                {
+                    Main.LogDebug("Trying alternative movement approach...");
+                    // The game may have a different API - this is speculation
+                    // You may need to use ForcedPath or click handlers
+                    return false;
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 

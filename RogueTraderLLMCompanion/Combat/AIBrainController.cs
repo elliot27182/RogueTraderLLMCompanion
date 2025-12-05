@@ -1,31 +1,26 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
-// Verified game assemblies from ToyBox source + Gemini 3's analysis:
-// Brain Switch: PartUnitUISettings (AIControlled property)
-// Action Queue: UnitCommand, UnitUseAbility, UnitMoveTo
-// State Reader: BaseUnitDataUtils patterns
+// =============================================================================
+// VERIFIED APIs from decompiled Code.dll:
+// - PartUnitBrain.IsAIEnabled (get/set) - Controls AI behavior
+// - PartUnitBrain is in Kingmaker.UnitLogic namespace
+// =============================================================================
 
 #if !DEBUG_WITHOUT_GAME
 using Kingmaker;
 using Kingmaker.EntitySystem.Entities;
-using Kingmaker.Mechanics.Entities;
 using Kingmaker.UnitLogic;
-using Kingmaker.UnitLogic.Parts;
-using Kingmaker.UnitLogic.Abilities;
-using Kingmaker.Controllers.TurnBased;
-using Kingmaker.Controllers.Combat;
 #endif
 
 namespace RogueTraderLLMCompanion.Combat
 {
     /// <summary>
     /// Manages AI control state for units.
-    /// Implements the "Brain Switch" pattern from Gemini 3's analysis.
+    /// Implements the "Brain Switch" pattern - disabling default AI so LLM can control.
     /// 
-    /// Key concept: Disable the game's default AI so the unit waits for OUR commands,
-    /// while keeping the unit in combat and maintaining faction status.
+    /// VERIFIED API from decompiled Code.dll (PartUnitBrain.cs line 139-149):
+    /// - PartUnitBrain.IsAIEnabled { get; set; }
     /// </summary>
     public static class AIBrainController
     {
@@ -35,7 +30,7 @@ namespace RogueTraderLLMCompanion.Combat
 #if !DEBUG_WITHOUT_GAME
         /// <summary>
         /// Disables the default AI for a unit so we can control it.
-        /// This is the "Brain Switch" - telling the game's AI to step aside.
+        /// Uses verified API: PartUnitBrain.IsAIEnabled
         /// </summary>
         public static bool DisableDefaultAI(BaseUnitEntity unit)
         {
@@ -45,27 +40,17 @@ namespace RogueTraderLLMCompanion.Combat
             {
                 string unitId = unit.UniqueId ?? unit.GetHashCode().ToString();
 
-                // Method 1: Use PartUnitUISettings (verified via game's "Override AI Control" feature)
-                // This is the built-in game mechanism for controlling AI behavior
-                var uiSettings = unit.Parts.Get<PartUnitUISettings>();
-                if (uiSettings != null)
-                {
-                    // The game has built-in AI control override
-                    // When we're controlling, we want to override the AI
-                    uiSettings.OverrideAIControlBehaviour = true;
-                    uiSettings.MakeCharacterAIControlled = false; // WE control, not AI
-                    
-                    Main.LogDebug($"Disabled AI for {unit.CharacterName} via PartUnitUISettings");
-                }
-
-                // Method 2: Check for PartUnitBrain if it exists
-                // Some Owlcat games have a separate brain component
-                var brain = unit.Parts.Get<PartUnitBrain>();
+                // VERIFIED API: PartUnitBrain.IsAIEnabled
+                // From decompiled Code.dll/Kingmaker/UnitLogic/PartUnitBrain.cs
+                var brain = unit.GetOptional<PartUnitBrain>();
                 if (brain != null)
                 {
-                    // Disable automatic decision making
-                    brain.IsActive = false;
-                    Main.LogDebug($"Disabled brain for {unit.CharacterName} via PartUnitBrain");
+                    brain.IsAIEnabled = false;
+                    Main.Log($"Disabled AI for {unit.CharacterName} via PartUnitBrain.IsAIEnabled");
+                }
+                else
+                {
+                    Main.LogWarning($"No PartUnitBrain found for {unit.CharacterName}");
                 }
 
                 _controlledUnits.Add(unitId);
@@ -79,7 +64,7 @@ namespace RogueTraderLLMCompanion.Combat
         }
 
         /// <summary>
-        /// Re-enables the default AI for a unit (when we're done controlling it).
+        /// Re-enables the default AI for a unit.
         /// </summary>
         public static bool EnableDefaultAI(BaseUnitEntity unit)
         {
@@ -89,21 +74,11 @@ namespace RogueTraderLLMCompanion.Combat
             {
                 string unitId = unit.UniqueId ?? unit.GetHashCode().ToString();
 
-                // Restore PartUnitUISettings
-                var uiSettings = unit.Parts.Get<PartUnitUISettings>();
-                if (uiSettings != null)
-                {
-                    uiSettings.OverrideAIControlBehaviour = false;
-                    // Don't change MakeCharacterAIControlled - let it return to default
-                    
-                    Main.LogDebug($"Re-enabled AI for {unit.CharacterName}");
-                }
-
-                // Restore PartUnitBrain if it exists
-                var brain = unit.Parts.Get<PartUnitBrain>();
+                var brain = unit.GetOptional<PartUnitBrain>();
                 if (brain != null)
                 {
-                    brain.IsActive = true;
+                    brain.IsAIEnabled = true;
+                    Main.LogDebug($"Re-enabled AI for {unit.CharacterName}");
                 }
 
                 _controlledUnits.Remove(unitId);
@@ -147,33 +122,27 @@ namespace RogueTraderLLMCompanion.Combat
         }
 
         /// <summary>
-        /// Checks if a unit's AI is currently active (for debugging).
+        /// Checks if a unit's AI is currently active.
         /// </summary>
         public static bool IsAIActive(BaseUnitEntity unit)
         {
             if (unit == null) return false;
 
-            var uiSettings = unit.Parts.Get<PartUnitUISettings>();
-            if (uiSettings != null && uiSettings.OverrideAIControlBehaviour)
-            {
-                return uiSettings.MakeCharacterAIControlled;
-            }
-
-            // Default: AI is active for player faction units not being controlled
-            return unit.IsPlayerFaction;
+            var brain = unit.GetOptional<PartUnitBrain>();
+            return brain?.IsAIEnabled ?? false;
         }
 
 #else
         // Debug stubs
         public static bool DisableDefaultAI(object unit) 
         { 
-            Main.Log("[DEMO] Would disable AI"); 
+            Main.Log("[DEMO] Would disable AI via PartUnitBrain.IsAIEnabled"); 
             return true; 
         }
         
         public static bool EnableDefaultAI(object unit) 
         { 
-            Main.Log("[DEMO] Would enable AI"); 
+            Main.Log("[DEMO] Would enable AI via PartUnitBrain.IsAIEnabled"); 
             return true; 
         }
         
@@ -182,17 +151,4 @@ namespace RogueTraderLLMCompanion.Combat
         public static bool IsAIActive(object unit) => false;
 #endif
     }
-
-#if !DEBUG_WITHOUT_GAME
-    /// <summary>
-    /// Placeholder for PartUnitBrain if it doesn't exist in the actual game.
-    /// The actual class name may differ - check game assemblies.
-    /// </summary>
-    // Note: This is a placeholder - the actual type may be:
-    // - PartUnitBrain
-    // - PartAI  
-    // - UnitBrain
-    // - etc.
-    // You'll need to check the decompiled Assembly-CSharp.dll
-#endif
 }

@@ -430,7 +430,7 @@ namespace RogueTraderLLMCompanion.Combat
 #if !DEBUG_WITHOUT_GAME
             if (_currentUnit == null) return false;
 
-            // Check action points using PartUnitCombatState
+            // VERIFIED: ActionPointsYellow (from decompiled PartUnitCombatState.cs line 123)
             var combatState = _currentUnit.Parts.Get<PartUnitCombatState>();
             return combatState?.ActionPointsYellow > 0;
 #else

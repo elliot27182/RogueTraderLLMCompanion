@@ -249,30 +249,39 @@ namespace RogueTraderLLMCompanion.Combat
             }
         }
 
+        // =================================================================
+        // VERIFIED APIs from decompiled Code.dll/Kingmaker/Controllers/Combat/PartUnitCombatState.cs
+        // Line 123: public int ActionPointsYellow { get; private set; }
+        // Line 99:  public float ActionPointsBlue { get; private set; }
+        // Line 117: public float ActionPointsBlueMax { get; set; }
+        // =================================================================
+
         private int GetActionPoints(BaseUnitEntity unit)
         {
-            // PartUnitCombatState from Combat/ActionsRT.cs
+            // VERIFIED: ActionPointsYellow (line 123 of PartUnitCombatState.cs)
             var combatState = unit.Parts.Get<PartUnitCombatState>();
             return combatState?.ActionPointsYellow ?? 0;
         }
 
         private int GetMaxActionPoints(BaseUnitEntity unit)
         {
+            // VERIFIED: WarhammerInitialAPYellow stat (line 389-395 of PartUnitCombatState.cs)
             var combatState = unit.Parts.Get<PartUnitCombatState>();
-            return combatState?.MaxActionPointsYellow ?? 3;
+            return combatState?.WarhammerInitialAPYellow?.BaseValue ?? 3;
         }
 
         private float GetMovementPoints(BaseUnitEntity unit)
         {
+            // VERIFIED: ActionPointsBlue (line 99 of PartUnitCombatState.cs)
             var combatState = unit.Parts.Get<PartUnitCombatState>();
             return combatState?.ActionPointsBlue ?? 0;
         }
 
         private float GetMaxMovementPoints(BaseUnitEntity unit)
         {
-            // PartMovable from MovementRT.cs
-            var movable = unit.Parts.Get<PartMovable>();
-            return movable?.ModifiedSpeedMps ?? 30f;
+            // VERIFIED: ActionPointsBlueMax (line 117 of PartUnitCombatState.cs)
+            var combatState = unit.Parts.Get<PartUnitCombatState>();
+            return combatState?.ActionPointsBlueMax ?? 30f;
         }
 
         private int GetStatValue(UnitStats stats, StatType statType)
