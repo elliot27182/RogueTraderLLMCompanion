@@ -194,11 +194,54 @@ namespace RogueTraderLLMCompanion.Combat
         {
             if (!_enabled || !_inCombat) return;
 
+#if !DEBUG_WITHOUT_GAME
+            // =================================================================
+            // FIX: "Hallucinating Commander" Bug (per G3 analysis)
+            // =================================================================
+            // Problem: After executing a command (like Move), we immediately
+            // requested the next LLM action. But the game takes time to animate!
+            // Result: LLM sees OLD position and makes bad decisions.
+            // 
+            // Solution: Wait for unit's command queue to be empty before 
+            // requesting the next LLM action.
+            // =================================================================
+            
+            if (_isExecutingAction && _currentUnit != null)
+            {
+                // Check if the unit is still acting (command queue not empty)
+                var commands = _currentUnit.Commands;
+                if (commands != null && !commands.Empty)
+                {
+                    // Unit is busy moving/casting - do NOT request new LLM action yet
+                    return;
+                }
+                
+                // Command queue is empty - unit is idle and ready for next instruction
+                _isExecutingAction = false;
+                Main.LogDebug("Unit finished executing, ready for next action");
+                
+                // NOW we can safely check if we should continue or end turn
+                if (HasActionsRemaining())
+                {
+                    // Still have AP - ask LLM for next action
+                    RequestLLMAction();
+                }
+                else
+                {
+                    // No AP left - end the turn
+                    _actionExecutor.EndTurn(_currentUnit);
+                    _pendingAction = null;
+                }
+                return;
+            }
+#endif
+
+            // Handle pending action (manual mode waits, auto mode executes)
             if (_pendingAction != null && !_isExecutingAction)
             {
                 if (_settings.ExecutionMode == ExecutionMode.Manual)
                 {
-                    // In Manual mode, wait for user confirmation
+                    // In Manual mode, wait for user confirmation via UI
                     return;
                 }
 
@@ -277,6 +320,7 @@ namespace RogueTraderLLMCompanion.Combat
         {
             if (_pendingAction == null || _currentUnit == null) return;
 
+            // Set flag to block new LLM requests until command completes
             _isExecutingAction = true;
 
             try
@@ -290,27 +334,29 @@ namespace RogueTraderLLMCompanion.Combat
                 else
                 {
                     Main.LogWarning($"Action execution failed: {_pendingAction.ToDisplayString()}");
+                    // On failure, clear the executing flag so we can try again or end turn
+                    _isExecutingAction = false;
                 }
 
-                // Check if there are more actions to take
-                if (HasActionsRemaining())
-                {
-                    _pendingAction = null;
-                    _isExecutingAction = false;
-                    RequestLLMAction();
-                }
-                else
-                {
-                    _actionExecutor.EndTurn(_currentUnit);
-                    _pendingAction = null;
-                    _isExecutingAction = false;
-                }
+                // =================================================================
+                // FIX: Removed recursive logic (per G3 analysis)
+                // =================================================================
+                // OLD (BUGGY): Immediately called RequestLLMAction() here
+                // NEW: Just clear pending action, let Update() loop detect when
+                //      command queue is empty and THEN request next action.
+                // =================================================================
+                
+                // Clear the pending action - it's been sent to the game
+                _pendingAction = null;
+                
+                // DO NOT clear _isExecutingAction here!
+                // Update() will clear it when unit.Commands.Empty becomes true
             }
             catch (Exception ex)
             {
                 Main.LogError($"Error executing action: {ex}");
                 _pendingAction = null;
-                _isExecutingAction = false;
+                _isExecutingAction = false; // Allow recovery on error
             }
         }
 

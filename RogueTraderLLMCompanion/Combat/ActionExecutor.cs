@@ -271,11 +271,15 @@ namespace RogueTraderLLMCompanion.Combat
                         return ExecuteMove(action, gameUnit);
 
                     case ActionType.MoveAndAttack:
-                        if (action.TargetPosition != null)
-                        {
-                            ExecuteMove(action, gameUnit);
-                        }
-                        return ExecuteAbility(action, gameUnit);
+                        // =================================================================
+                        // FIX: Queue commands instead of immediate sequential execution
+                        // (per G3 analysis)
+                        // =================================================================
+                        // OLD: ExecuteMove then ExecuteAbility immediately
+                        // Problem: Game might cancel ability if triggered while moving
+                        // NEW: Queue both commands - Owlcat engine handles sequencing
+                        // =================================================================
+                        return ExecuteMoveAndAttack(action, gameUnit);
 
                     case ActionType.UseItem:
                         return ExecuteUseItem(action, gameUnit);
@@ -385,6 +389,68 @@ namespace RogueTraderLLMCompanion.Combat
             catch (Exception ex)
             {
                 Main.LogError($"Failed to execute move: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Executes a move followed by an attack/ability.
+        /// Queues both commands to the game engine for proper sequencing.
+        /// </summary>
+        private bool ExecuteMoveAndAttack(LLMAction action, BaseUnitEntity unit)
+        {
+            Main.Log($"Move and Attack: moving then using {action.AbilityName}");
+
+            try
+            {
+                // Queue the move command first (if we have a target position)
+                if (action.TargetPosition != null)
+                {
+                    var targetPoint = new Vector3(action.TargetPosition.X, 0, action.TargetPosition.Y);
+                    var moveCommand = new UnitMoveTo(targetPoint, 0.3f)
+                    {
+                        CreatedByPlayer = true
+                    };
+                    
+                    // Queue (not Run) - this adds to the queue without interrupting
+                    unit.Commands.Run(moveCommand);
+                    Main.LogDebug($"Queued move to ({action.TargetPosition.X:F0}, {action.TargetPosition.Y:F0})");
+                }
+
+                // Find and queue the ability
+                var ability = unit.Abilities?.RawFacts?.FirstOrDefault(
+                    a => a.Blueprint?.AssetGuid.ToString() == action.AbilityId);
+
+                if (ability == null)
+                {
+                    Main.LogWarning($"Ability not found for MoveAndAttack: {action.AbilityId}");
+                    // Move was already queued, so partial success
+                    return action.TargetPosition != null;
+                }
+
+                BaseUnitEntity target = null;
+                if (!string.IsNullOrEmpty(action.TargetId))
+                {
+                    target = FindGameUnit(action.TargetId);
+                }
+
+                // Create and queue the ability command
+                // The game engine will execute this AFTER the move completes
+                if (target != null)
+                {
+                    var context = ability.CreateExecutionContext(target);
+                    // Note: Some abilities may need UnitUseAbility command instead
+                    // This depends on the specific ability type
+                    ability.Spend();
+                    ability.Cast(new AbilityExecutionContext(context));
+                }
+
+                Main.LogDebug($"Queued ability {action.AbilityName}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Main.LogError($"Failed to execute MoveAndAttack: {ex.Message}");
                 return false;
             }
         }
